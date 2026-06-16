@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LoL Dodge Engine · Skillshot dodge calculator</title>
+  <meta name="description" content="How much reaction-time slack does each boot tier actually buy you? Interactive skillshot-dodge calculator based on the League of Legends movement-speed formula." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0A0E1A;
+      --surface:   #141928;
+      --surface2:  #1C2236;
+      --gold:      #C89B3C;
+      --gold-dim:  #7A5E22;
+      --cyan:      #5BC8F5;
+      --cyan-dim:  #2A6E8A;
+      --text:      #D8DDE8;
+      --muted:     #7B8499;
+      --danger:    #E84545;
+      --safe:      #48C98E;
+      --rule:      rgba(200,155,60,0.18);
+      --font-display: 'Rajdhani', sans-serif;
+      --font-body:    'Inter', sans-serif;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── header ── */
+    header {
+      border-bottom: 1px solid var(--rule);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+    }
+    header h1 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    header p {
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    header a {
+      margin-left: auto;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.15s;
+    }
+    header a:hover { color: var(--gold); }
+
+    /* ── hero ── */
+    .hero {
+      padding: 3rem 2rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid var(--rule);
+    }
+    .hero-label {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .hero-window {
+      font-family: var(--font-display);
+      font-size: clamp(4rem, 14vw, 8rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      color: var(--cyan);
+      transition: color 0.2s;
+    }
+    .hero-window.danger { color: var(--danger); }
+    .hero-window.safe   { color: var(--safe); }
+    .hero-unit {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .hero-boot {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .hero-boot strong {
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .hero-dodgeable {
+      display: inline-block;
+      margin-top: 0.5rem;
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.75rem;
+      border-radius: 2px;
+    }
+    .hero-dodgeable.yes {
+      background: rgba(72,201,142,0.12);
+      color: var(--safe);
+      border: 1px solid rgba(72,201,142,0.3);
+    }
+    .hero-dodgeable.no {
+      background: rgba(232,69,69,0.12);
+      color: var(--danger);
+      border: 1px solid rgba(232,69,69,0.3);
+    }
+
+    /* ── main layout ── */
+    .layout {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 2.5rem;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; padding: 1.25rem; gap: 2rem; }
+    }
+
+    /* ── controls panel ── */
+    .controls-panel { position: sticky; top: 1rem; }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .control-group { margin-bottom: 1.5rem; }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.4rem;
+    }
+    .control-label span:first-child {
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .control-label .val {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      min-width: 3.5rem;
+      text-align: right;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 2px;
+      background: var(--surface2);
+      outline: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.3); }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: none;
+      cursor: pointer;
+    }
+
+    .boot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .boot-btn {
+      background: var(--surface);
+      border: 1px solid var(--surface2);
+      color: var(--muted);
+      font-family: var(--font-display);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      border-radius: 2px;
+      text-align: left;
+      transition: border-color 0.15s, color 0.15s;
+      line-height: 1.3;
+    }
+    .boot-btn small {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--gold-dim);
+      margin-top: 0.1rem;
+    }
+    .boot-btn:hover {
+      border-color: var(--gold-dim);
+      color: var(--text);
+    }
+    .boot-btn.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(200,155,60,0.06);
+    }
+
+    /* ── results panel ── */
+    .results-panel {}
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 2rem;
+    }
+    .comparison-table th {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-align: right;
+      padding: 0 0 0.75rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    .comparison-table th:first-child { text-align: left; }
+    .comparison-table td {
+      padding: 0.7rem 0;
+      font-size: 0.875rem;
+      color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      text-align: right;
+      vertical-align: middle;
+    }
+    .comparison-table td:first-child { text-align: left; }
+    .comparison-table tr.active-boot td { color: var(--gold); }
+    .comparison-table tr.active-boot .boot-name-cell {
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .window-bar-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .window-bar {
+      height: 4px;
+      background: var(--cyan);
+      border-radius: 2px;
+      transition: width 0.25s ease;
+      min-width: 2px;
+    }
+    .window-bar.danger { background: var(--danger); }
+
+    .tier-badge {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 0.1rem 0.35rem;
+      border-radius: 2px;
+      margin-right: 0.35rem;
+      vertical-align: middle;
+    }
+    .tier-0 { background: rgba(123,132,153,0.15); color: var(--muted); }
+    .tier-1 { background: rgba(200,155,60,0.12); color: var(--gold-dim); }
+    .tier-2 { background: rgba(91,200,245,0.12); color: #5BC8F5; }
+    .tier-3 { background: rgba(72,201,142,0.12); color: var(--safe); }
+
+    .delta {
+      font-size: 0.75rem;
+      color: var(--safe);
+      font-family: var(--font-display);
+      font-weight: 600;
+    }
+    .delta.neg { color: var(--danger); }
+
+    /* ── chart ── */
+    .chart-wrap {
+      margin-top: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 1.25rem 1.25rem 1rem;
+    }
+    .chart-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .chart-container { position: relative; height: 200px; }
+
+    /* ── stat row ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 0.875rem 1rem;
+    }
+    .stat-card-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: var(--font-display);
+      font-weight: 500;
+    }
+    .stat-card-value {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── math note ── */
+    .math-note {
+      margin-top: 2rem;
+      padding: 1rem 1.25rem;
+      border-left: 2px solid var(--gold-dim);
+      background: rgba(200,155,60,0.04);
+    }
+    .math-note p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .math-note code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: var(--cyan);
+      background: rgba(91,200,245,0.08);
+      padding: 0.05rem 0.3rem;
+      border-radius: 2px;
+    }
+
+    /* ── footer ── */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    footer p {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--gold-dim); text-decoration: none; }
+    footer a:hover { color: var(--gold); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>LoL Dodge Engine</h1>
+  <p>Skillshot dodge geometry · linear, non-tracking</p>
+  <a href="https://github.com/dcass5212/lol-dodge-engine" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+    dcass5212 / lol-dodge-engine
+  </a>
+</header>
+
+<div class="hero" role="region" aria-label="Dodge window readout">
+  <div class="hero-label">dodge window</div>
+  <div class="hero-window" id="heroWindow">—</div>
+  <div class="hero-unit">milliseconds of reaction time</div>
+  <div class="hero-boot" id="heroBoot">&nbsp;</div>
+  <div class="hero-dodgeable" id="heroDodgeable">&nbsp;</div>
+</div>
+
+<div class="layout">
+
+  <!-- ── controls ── -->
+  <aside class="controls-panel" role="form" aria-label="Scenario controls">
+
+    <div class="section-title">Boot tier</div>
+    <div class="boot-grid" id="bootGrid" style="margin-bottom:2rem;"></div>
+
+    <div class="section-title">Scenario</div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Base move speed</span>
+        <span class="val" id="val-base_ms">330</span>
+      </div>
+      <input type="range" id="sl-base_ms" min="305" max="360" step="5" value="330"
+             aria-label="Base move speed" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Missile speed</span>
+        <span class="val" id="val-missile_speed">1200</span>
+      </div>
+      <input type="range" id="sl-missile_speed" min="600" max="3000" step="50" value="1200"
+             aria-label="Missile speed" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Distance to you (units)</span>
+        <span class="val" id="val-distance">800</span>
+      </div>
+      <input type="range" id="sl-distance" min="200" max="1500" step="50" value="800"
+             aria-label="Distance" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Skillshot width (radius)</span>
+        <span class="val" id="val-skillshot_radius">65</span>
+      </div>
+      <input type="range" id="sl-skillshot_radius" min="20" max="200" step="5" value="65"
+             aria-label="Skillshot radius" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Reaction time (ms)</span>
+        <span class="val" id="val-reaction_time_ms">250</span>
+      </div>
+      <input type="range" id="sl-reaction_time_ms" min="100" max="500" step="10" value="250"
+             aria-label="Reaction time" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Incoming slow</span>
+        <span class="val" id="val-slow_pct">0%</span>
+      </div>
+      <input type="range" id="sl-slow_pct" min="0" max="0.99" step="0.01" value="0"
+             aria-label="Incoming slow" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Cast delay (ms)</span>
+        <span class="val" id="val-cast_delay_ms">0</span>
+      </div>
+      <input type="range" id="sl-cast_delay_ms" min="0" max="500" step="25" value="0"
+             aria-label="Cast delay" />
+    </div>
+
+  </aside>
+
+  <!-- ── results ── -->
+  <main role="main">
+
+    <div class="section-title" style="margin-bottom:1rem;">Boot comparison</div>
+
+    <div class="stat-row" id="statRow">
+      <div class="stat-card">
+        <div class="stat-card-label">Time to impact</div>
+        <div class="stat-card-value" id="statImpact">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Required MS to dodge</div>
+        <div class="stat-card-value" id="statRequired">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-label">Your effective MS</div>
+        <div class="stat-card-value" id="statEffective">—</div>
+      </div>
+    </div>
+
+    <table class="comparison-table" id="compTable" aria-label="Boot comparison">
+      <thead>
+        <tr>
+          <th>Boot</th>
+          <th>MS</th>
+          <th>Window</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="compBody"></tbody>
+    </table>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Dodge window vs. move speed — selected boot</div>
+      <div class="chart-container">
+        <canvas id="curveChart" role="img"
+          aria-label="Line chart of dodge window versus move speed for the selected boot"></canvas>
+      </div>
+    </div>
+
+    <div class="math-note" role="note">
+      <p>
+        <strong style="color:var(--text);">The model:</strong>
+        For a linear non-tracking skillshot, optimal dodge direction is perpendicular to the missile path.
+        You escape if your lateral displacement exceeds the combined radius
+        <code>S = r_champ + r_shot</code> before impact.
+        The <em>dodge window</em> — max reaction time that still escapes — is
+        <code>W(v) = (cast_delay + distance / missile_speed) − S / v</code>,
+        where <code>v</code> is your effective move speed after LoL's formula
+        (flat → additive % → slow × (1 − slow_resist) → soft caps).
+        Marginal value <code>dW/dv = S / v²</code> is always positive and always diminishing:
+        your first boots help more than each upgrade, and a slow collapses the window faster
+        than +20 MS rebuilds it.
+      </p>
+    </div>
+
+  </main>
+</div>
+
+<footer>
+  <p>Movement-speed formula &amp; boot values from <a href="https://wiki.leagueoflegends.com/en-us/Movement_speed" target="_blank" rel="noopener">wiki.leagueoflegends.com</a>. Not affiliated with Riot Games.</p>
+  <p>Part of <a href="https://github.com/dcass5212/lol-dodge-engine" target="_blank" rel="noopener">lol-dodge-engine</a> · MIT</p>
+</footer>
+
+<script>
+// ── engine (mirrors dodge_model.py exactly) ────────────────────────────────
+
+function applySoftCaps(raw) {
+  if (raw < 0)     return 110 + raw * 0.01;
+  if (raw < 220)   return 110 + raw * 0.5;
+  if (raw <= 415)  return raw;
+  if (raw <= 490)  return raw * 0.8 + 83;
+  return raw * 0.5 + 230;
+}
+
+function effectiveMS(base, flat, additivePct, multPcts, slow, slowResist) {
+  let raw = (base + flat) * (1 + additivePct);
+  for (const m of multPcts) raw *= (1 + m);
+  raw *= (1 - slow * (1 - slowResist));
+  return applySoftCaps(raw);
+}
+
+function evaluate(scn, boot) {
+  const v = effectiveMS(scn.base_ms, boot.flat_ms, 0, [], scn.slow_pct, boot.slow_resist);
+  const S = scn.champion_radius + scn.skillshot_radius;
+  const T = scn.cast_delay_ms / 1000 + scn.distance / scn.missile_speed;
+  const window_ms = v > 0 ? (T - S / v) * 1000 : -Infinity;
+  const avail_s = T - scn.reaction_time_ms / 1000;
+  const reach = v * Math.max(avail_s, 0);
+  const required = avail_s > 0 ? S / avail_s : Infinity;
+  const marginal = v > 0 ? (S / (v * v)) * 1000 : Infinity;
+  return {
+    ...boot,
+    effective_ms: v,
+    time_to_impact_ms: T * 1000,
+    clearance_units: S,
+    dodge_window_ms: window_ms,
+    dodgeable: v > 0 && window_ms >= scn.reaction_time_ms,
+    lateral_reach: reach,
+    lateral_margin: reach - S,
+    required_ms: required,
+    marginal_ms_per_point: marginal,
+  };
+}
+
+// ── boot registry ──────────────────────────────────────────────────────────
+
+const BOOTS = [
+  { id: 'none',        name: 'No boots',              tier: 0, flat_ms: 0,  slow_resist: 0 },
+  { id: 'boots',       name: 'Boots',                 tier: 1, flat_ms: 25, slow_resist: 0 },
+  { id: 'berserkers',  name: "Berserker's Greaves",   tier: 2, flat_ms: 45, slow_resist: 0,    note: 'atk spd' },
+  { id: 'sorcerers',   name: "Sorcerer's Shoes",      tier: 2, flat_ms: 45, slow_resist: 0,    note: 'mag pen' },
+  { id: 'plated',      name: 'Plated Steelcaps',      tier: 2, flat_ms: 45, slow_resist: 0,    note: 'armor' },
+  { id: 'mercurys',    name: "Mercury's Treads",      tier: 2, flat_ms: 45, slow_resist: 0,    note: 'MR / tenacity' },
+  { id: 'ionian',      name: 'Ionian Boots',          tier: 2, flat_ms: 45, slow_resist: 0,    note: 'haste' },
+  { id: 'symbiotic',   name: 'Symbiotic Soles',       tier: 2, flat_ms: 40, slow_resist: 0,    note: 'roam spd' },
+  { id: 'swiftness',   name: 'Boots of Swiftness',    tier: 2, flat_ms: 55, slow_resist: 0.25, note: 'slow resist' },
+  { id: 'swiftmarch',  name: 'Swiftmarch',            tier: 3, flat_ms: 65, slow_resist: 0.25, note: 'upgraded' },
+];
+
+const TIER_LABEL = ['NONE','T1','T2','T3'];
+const COMPARE_IDS = ['none', 'boots', 'berserkers', 'swiftness'];
+
+// ── state ──────────────────────────────────────────────────────────────────
+
+const scn = {
+  base_ms: 330, champion_radius: 65, skillshot_radius: 65,
+  missile_speed: 1200, distance: 800, cast_delay_ms: 0,
+  reaction_time_ms: 250, slow_pct: 0,
+};
+let activeBoot = BOOTS.find(b => b.id === 'berserkers');
+
+// ── boot grid ──────────────────────────────────────────────────────────────
+
+const bootGrid = document.getElementById('bootGrid');
+BOOTS.forEach(boot => {
+  const btn = document.createElement('button');
+  btn.className = 'boot-btn' + (boot.id === activeBoot.id ? ' active' : '');
+  btn.dataset.id = boot.id;
+  btn.innerHTML = boot.name
+    + (boot.note ? `<small>+${boot.flat_ms} MS · ${boot.note}</small>`
+                 : `<small>+${boot.flat_ms} MS</small>`);
+  btn.addEventListener('click', () => {
+    activeBoot = boot;
+    bootGrid.querySelectorAll('.boot-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.id === boot.id));
+    render();
+  });
+  bootGrid.appendChild(btn);
+});
+
+// ── sliders ────────────────────────────────────────────────────────────────
+
+const SLIDERS = [
+  { id: 'base_ms',          fmt: v => v },
+  { id: 'missile_speed',    fmt: v => v },
+  { id: 'distance',         fmt: v => v },
+  { id: 'skillshot_radius', fmt: v => v },
+  { id: 'reaction_time_ms', fmt: v => v },
+  { id: 'slow_pct',         fmt: v => Math.round(v * 100) + '%' },
+  { id: 'cast_delay_ms',    fmt: v => v },
+];
+
+SLIDERS.forEach(({ id, fmt }) => {
+  const sl = document.getElementById(`sl-${id}`);
+  const vl = document.getElementById(`val-${id}`);
+  sl.addEventListener('input', () => {
+    const v = parseFloat(sl.value);
+    scn[id] = v;
+    vl.textContent = fmt(id === 'slow_pct' ? v : Math.round(v));
+    render();
+  });
+});
+
+// ── chart ──────────────────────────────────────────────────────────────────
+
+const ctx = document.getElementById('curveChart').getContext('2d');
+const curveChart = new Chart(ctx, {
+  type: 'line',
+  data: { labels: [], datasets: [
+    {
+      label: 'Dodge window (ms)',
+      data: [], borderColor: '#5BC8F5', borderWidth: 2,
+      pointRadius: 0, tension: 0.3, fill: false,
+    },
+    {
+      label: 'Reaction time',
+      data: [], borderColor: '#C89B3C', borderWidth: 1,
+      borderDash: [6, 4], pointRadius: 0, fill: false,
+    },
+    {
+      label: 'You (current)',
+      data: [], borderColor: 'transparent',
+      backgroundColor: '#C89B3C',
+      pointRadius: 6, pointHoverRadius: 8,
+      showLine: false,
+    }
+  ]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#141928',
+        borderColor: '#C89B3C',
+        borderWidth: 1,
+        titleColor: '#C89B3C',
+        bodyColor: '#D8DDE8',
+        callbacks: {
+          label: c => {
+            if (c.datasetIndex === 0) return `Window: ${Math.round(c.parsed.y)} ms`;
+            if (c.datasetIndex === 1) return `Reaction: ${Math.round(c.parsed.y)} ms`;
+            return null;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'base move speed', color: '#7B8499', font: { size: 11 } },
+        ticks: { color: '#7B8499', font: { size: 11 }, maxTicksLimit: 8 },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      },
+      y: {
+        title: { display: true, text: 'window (ms)', color: '#7B8499', font: { size: 11 } },
+        ticks: { color: '#7B8499', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+      }
+    }
+  }
+});
+
+// ── render ─────────────────────────────────────────────────────────────────
+
+function render() {
+  const active = evaluate(scn, activeBoot);
+
+  // hero
+  const hero = document.getElementById('heroWindow');
+  const heroUnit = document.getElementById('heroBoot');
+  const heroDodge = document.getElementById('heroDodgeable');
+  hero.textContent = isFinite(active.dodge_window_ms)
+    ? Math.round(active.dodge_window_ms)
+    : '—';
+  hero.className = 'hero-window' + (active.dodgeable ? ' safe' : ' danger');
+  heroUnit.innerHTML = `with <strong>${activeBoot.name}</strong> · ${Math.round(active.effective_ms)} MS`;
+  heroDodge.textContent = active.dodgeable ? 'dodgeable' : 'not dodgeable';
+  heroDodge.className = 'hero-dodgeable ' + (active.dodgeable ? 'yes' : 'no');
+
+  // stat cards
+  document.getElementById('statImpact').textContent =
+    Math.round(active.time_to_impact_ms) + ' ms';
+  document.getElementById('statRequired').textContent =
+    isFinite(active.required_ms) ? Math.round(active.required_ms) + ' MS' : '—';
+  document.getElementById('statEffective').textContent =
+    Math.round(active.effective_ms) + ' MS';
+
+  // comparison table
+  const results = COMPARE_IDS.map(id => evaluate(scn, BOOTS.find(b => b.id === id)));
+  const maxWin = Math.max(...results.map(r => r.dodge_window_ms).filter(isFinite));
+  const tbody = document.getElementById('compBody');
+  tbody.innerHTML = '';
+  let prevWindow = null;
+  results.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const isActive = r.id === activeBoot.id;
+    if (isActive) tr.className = 'active-boot';
+    const delta = prevWindow !== null && isFinite(r.dodge_window_ms) && isFinite(prevWindow)
+      ? r.dodge_window_ms - prevWindow : null;
+    const barPct = isFinite(r.dodge_window_ms) && maxWin > 0
+      ? Math.max(0, r.dodge_window_ms) / maxWin * 120 : 0;
+    const barDanger = !r.dodgeable;
+    tr.innerHTML = `
+      <td class="boot-name-cell">
+        <span class="tier-badge tier-${r.tier}">${TIER_LABEL[r.tier]}</span>${r.name}
+      </td>
+      <td>${Math.round(r.effective_ms)}</td>
+      <td>
+        <div class="window-bar-wrap">
+          ${delta !== null ? `<span class="delta${delta < 0 ? ' neg' : ''}">
+            ${delta >= 0 ? '+' : ''}${Math.round(delta)} ms
+          </span>` : ''}
+          <div class="window-bar${barDanger ? ' danger' : ''}" style="width:${barPct}px"></div>
+          <span style="min-width:3.5rem;text-align:right;font-family:'Rajdhani',sans-serif;font-weight:600;">
+            ${isFinite(r.dodge_window_ms) ? Math.round(r.dodge_window_ms) : '—'}
+          </span>
+        </div>
+      </td>
+      <td style="font-size:0.75rem;color:${r.dodgeable ? 'var(--safe)' : 'var(--danger)'};">
+        ${r.dodgeable ? '✓' : '✗'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+    prevWindow = r.dodge_window_ms;
+  });
+
+  // curve chart — sweep base_ms 300→420, active boot
+  const xs = [];
+  for (let ms = 300; ms <= 420; ms += 3) xs.push(ms);
+  const baseScn = { ...scn };
+  const curveData = xs.map(ms => {
+    const s = { ...baseScn, base_ms: ms };
+    const r = evaluate(s, activeBoot);
+    return isFinite(r.dodge_window_ms) ? r.dodge_window_ms : null;
+  });
+  const reactionLine = xs.map(() => scn.reaction_time_ms);
+  const youX = scn.base_ms;
+  const youY = isFinite(active.dodge_window_ms) ? active.dodge_window_ms : null;
+
+  curveChart.data.labels = xs;
+  curveChart.data.datasets[0].data = curveData;
+  curveChart.data.datasets[1].data = reactionLine;
+  curveChart.data.datasets[2].data = xs.map(x => x === youX ? youY : null);
+  curveChart.update('none');
+}
+
+// initial render
+render();
+</script>
+</body>
+</html>
