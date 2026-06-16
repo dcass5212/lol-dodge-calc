@@ -4,7 +4,7 @@
 
 An interactive skillshot-dodge calculator and Python model built on the [League of Legends movement-speed formula](https://wiki.leagueoflegends.com/en-us/Movement_speed).
 
-[**→ Live demo**](https://dcass5212.github.io/lol-dodge-engine)
+[**→ Live demo**](https://dcass5212.github.io/lol-dodge-calc)
 
 \---
 
