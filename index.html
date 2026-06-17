@@ -150,11 +150,14 @@
     }
     @media (max-width: 760px) {
       .layout { grid-template-columns: 1fr; padding: 1.25rem; gap: 2rem; }
-      .controls-panel { position: static; top: auto; }
     }
 
     /* ── controls panel ── */
-    .controls-panel { position: sticky; top: 1rem; }
+    /* Sticky only on the two-column desktop layout. Gated by min-width so it
+       can't fight the mobile single-column stack via source order. */
+    @media (min-width: 761px) {
+      .controls-panel { position: sticky; top: 1rem; }
+    }
 
     .section-title {
       font-family: var(--font-display);
